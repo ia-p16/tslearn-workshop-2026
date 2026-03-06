@@ -17,7 +17,13 @@ from tslearn.utils import to_time_series_dataset
 base_path = os.path.join('.', 'A multi-sensory dataset for the activities of daily living')
 
 
-def get_X_y(volunteers=None, imus=None, features=None, task_labels=None, min_size=None):
+def get_X_y(
+    volunteers=None,
+    imus=None,
+    features=None,
+    task_labels=None,
+    min_size=None, verbose=False
+):
     # Get all volunteers / imus / features / tasks by default
 
     features_map = {
@@ -88,7 +94,8 @@ def get_X_y(volunteers=None, imus=None, features=None, task_labels=None, min_siz
         for timestamp, samples in task.items():
             for imu in imus:
                 if imu not in samples:
-                    # print(f"task {task_index} {tasks[task_index]} with missing data", imu, timestamp)
+                    if verbose:
+                        print(f"task {task_index} {tasks[task_index]} with missing data", imu, timestamp)
                     samples[imu] = [np.nan] * len(features)
 
     dataset_final = []
@@ -104,7 +111,8 @@ def get_X_y(volunteers=None, imus=None, features=None, task_labels=None, min_siz
         if min_size is None or min_size <= len(task_final):
             dataset_final.append(task_final)
         else:
-            print(f"task {task_index} {tasks[task_index]} of size {len(task_final)} skipped")
+            if verbose:
+                print(f"task {task_index} {tasks[task_index]} of size {len(task_final)} skipped")
             tasks[task_index][2] = "to_remove"
 
     return to_time_series_dataset(dataset_final), [task for task in tasks if task[2] != "to_remove"]
