@@ -204,7 +204,7 @@ def visualize_clustering_results(model, dataset, labels):
                  color="white" if contingency[i, j] > contingency.max() / 2 else "black", fontsize=13)
     plt.colorbar(im, ax=ax1)
 
-    # PCA for 2D projection # TSNE?
+    # PCA for 2D projection
     _resampled = TimeSeriesResampler().fit_transform(dataset)
     n_samples, n_timesteps, n_feat = _resampled.shape
     flat = np.nan_to_num(_resampled.reshape(n_samples, n_timesteps * n_feat))
@@ -275,5 +275,73 @@ def visualize_classification_results(classifier, test_labels, pred_labels):
     ax2.set_title("Classification Report")
     ax2.text(0, 1, report, fontsize=12, fontfamily="monospace", transform=ax2.transAxes, va="top")
 
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_shapelets(shapelet_clf, feature_names=None):
+    n_shapelets = len(shapelet_clf.shapelets_)
+    fig, axes = plt.subplots(1, n_shapelets, figsize=(5 * n_shapelets, 3))
+
+    # handle single shapelet case
+    if n_shapelets == 1:
+        axes = [axes]
+
+    feature_colors = plt.get_cmap("tab10").colors
+
+    for i, shapelet in enumerate(shapelet_clf.shapelets_):
+        # shapelet shape: (length, n_features)
+        n_feat = shapelet.shape[1]
+        for f in range(n_feat):
+            label = feature_names[f] if feature_names else f"feature {f}"
+            axes[i].plot(shapelet[:, f], color=feature_colors[f % len(feature_colors)],
+                         label=label, linewidth=1.8)
+        axes[i].set_title(f"Shapelet {i + 1}\n(len={len(shapelet)})")
+        axes[i].legend(fontsize="small")
+        axes[i].set_xlabel("Time step")
+
+    plt.suptitle("Learned shapelets — all features", fontweight="bold")
+    plt.tight_layout()
+    plt.show()
+
+
+def visualize_shapelet_matches(shapelet_clf, data, labels, show_feature=0):
+    unique_lbls = np.unique(labels)
+    n_shapelets = len(shapelet_clf.shapelets_)
+    locations = shapelet_clf.locate(data)
+
+    fig, axes = plt.subplots(n_shapelets, len(unique_lbls), figsize=(12, 3 * n_shapelets))
+
+    # Ensure axes is always 2D
+    if n_shapelets == 1:
+        axes = axes[np.newaxis, :]
+    if len(unique_lbls) == 1:
+        axes = axes[:, np.newaxis]
+
+    for s_idx in range(n_shapelets):
+        shapelet = shapelet_clf.shapelets_[s_idx]
+        sz = len(shapelet)
+
+        for col, lbl in enumerate(unique_lbls):
+            ax = axes[s_idx, col]
+            # pick first series of this class
+            idx = np.where(labels == lbl)[0][0]
+            series = data[idx, :, show_feature]
+            best_pos = locations[idx, s_idx]
+            best_dist = np.linalg.norm(series[best_pos:best_pos + sz].reshape(-1) - shapelet.reshape(-1))
+
+            feature_colors = plt.get_cmap("tab10").colors
+            ax.plot(series, color=feature_colors[show_feature], alpha=0.5, label="feature series")
+
+            ax.plot(range(best_pos, best_pos + sz), series[best_pos:best_pos + sz],
+                    color="red", linewidth=2, label="best match")
+
+            ax.plot(range(best_pos, best_pos + sz), shapelet[:, show_feature], color="blue",
+                    linewidth=2, linestyle="--", label="shapelet")
+
+            ax.set_title(f"Shapelet {s_idx + 1} | Class: {lbl} {idx}\ndist={best_dist:.2f}")
+            ax.legend(fontsize="small")
+
+    plt.suptitle(f"Shapelets vs. Class for feature {show_feature}", fontweight="bold")
     plt.tight_layout()
     plt.show()
