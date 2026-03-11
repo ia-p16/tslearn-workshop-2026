@@ -353,3 +353,56 @@ def visualize_shapelet_matches(shapelet_clf, data, labels, show_feature=0):
     plt.suptitle(f"Shapelets vs. Class for feature {show_feature}", fontweight="bold")
     plt.tight_layout()
     plt.show()
+
+
+# Plot cluster centroids (one plot per cluster, all features in each plot)
+def visualize_cluster_centroids(model, feature_labels, time_index=None):
+
+    centroids = model.cluster_centers_
+    n_clusters, n_timesteps, n_features = centroids.shape
+
+    fig, axes = plt.subplots(n_clusters, 1, figsize=(12, 2.8 * max(1, n_clusters)), sharex=True)
+    axes = [axes] if n_clusters == 1 else axes
+
+    if time_index is None:
+        time_index = np.arange(n_timesteps)
+    else:
+        time_index = np.asarray(list(time_index))
+        if time_index.shape[0] != n_timesteps:
+            time_index = np.arange(n_timesteps)
+
+    n_plot_features = min(len(feature_labels), n_features)
+    feature_colors = plt.get_cmap("tab10").colors[:n_plot_features]
+
+    for k in range(n_clusters):
+        ax = axes[k]
+
+        # determine sensible y-limits using finite centroid values for this cluster
+        vals = np.hstack([centroids[k, :, f] for f in range(n_plot_features)])
+        finite = np.isfinite(vals)
+        if finite.any():
+            vmin, vmax = vals[finite].min(), vals[finite].max()
+            pad = (vmax - vmin) * 0.08 if vmax > vmin else 0.1
+            ax.set_ylim(vmin - pad, vmax + pad)
+
+        for f in range(n_plot_features):
+            ax.plot(time_index, centroids[k, :, f],
+                    color=feature_colors[f],
+                    label=feature_labels[f],
+                    linewidth=1.8, alpha=0.9)
+
+        ax.set_title(f"Cluster {k} centroid — all features")
+        ax.set_ylabel("Value")
+        ax.legend(loc="upper right", fontsize="small")
+
+        # xticks: up to 10 nicely spaced ticks
+        n_ticks = min(10, n_timesteps)
+        tick_pos = np.linspace(0, n_timesteps - 1, n_ticks).astype(int)
+        ax.set_xticks(time_index[tick_pos])
+        ax.set_xticklabels([str(time_index[i]) for i in tick_pos], rotation=0)
+
+    axes[-1].set_xlabel("Time index")
+    fig.suptitle("Cluster centroids — per cluster (all features)", fontsize=14, fontweight="bold")
+    plt.tight_layout()
+    plt.subplots_adjust(top=0.92)
+    plt.show()
