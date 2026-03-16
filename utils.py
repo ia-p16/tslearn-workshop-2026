@@ -20,7 +20,7 @@ base_path = os.path.join('.', 'A multi-sensory dataset for the activities of dai
 def get_X_y(
     volunteers=None,
     imus=None,
-    features=None,
+    feature_labels=None,
     task_labels=None,
     min_size=None, verbose=False
 ):
@@ -39,9 +39,9 @@ def get_X_y(
         volunteers = list(range(1, 11))
     if imus is None:
         imus = ["back", "lla", "lua", "rla", "rt", "rua"]
-    if features is None:
-        features = ["x-acc", "y-acc", "z-acc", "x-vel", "y-vel", "y-vel"]
-    features = [features_map[feature] for feature in features]
+    if feature_labels is None:
+        feature_labels = ["x-acc", "y-acc", "z-acc", "x-vel", "y-vel", "y-vel"]
+    features = [features_map[feature_label] for feature_label in feature_labels]
 
     dataset = []
     tasks = []
@@ -287,7 +287,7 @@ def visualize_classification_results(classifier, test_labels, pred_labels):
     plt.show()
 
 
-def visualize_shapelets(shapelet_clf, feature_names=None):
+def visualize_shapelets(shapelet_clf, feature_labels=None):
     n_shapelets = len(shapelet_clf.shapelets_)
     fig, axes = plt.subplots(1, n_shapelets, figsize=(5 * n_shapelets, 3))
 
@@ -301,7 +301,7 @@ def visualize_shapelets(shapelet_clf, feature_names=None):
         # shapelet shape: (length, n_features)
         n_feat = shapelet.shape[1]
         for f in range(n_feat):
-            label = feature_names[f] if feature_names else f"feature {f}"
+            label = feature_labels[f] if feature_labels else f"feature {f}"
             axes[i].plot(shapelet[:, f], color=feature_colors[f % len(feature_colors)],
                          label=label, linewidth=1.8)
         axes[i].set_title(f"Shapelet {i + 1}\n(len={len(shapelet)})")
@@ -352,6 +352,47 @@ def visualize_shapelet_matches(shapelet_clf, data, labels, show_feature=0):
 
     plt.suptitle(f"Shapelets vs. Class for feature {show_feature}", fontweight="bold")
     plt.tight_layout()
+    plt.show()
+
+
+def visualize_shapelet_projection(shapelet_clf, data, labels):
+    # Valid with 2 shapelets
+    distances = shapelet_clf.transform(data)
+    weights, biases = shapelet_clf.get_weights('classification')
+
+    unique_lbl = np.unique(labels)
+    cmap = plt.cm.viridis
+    fig = plt.figure()
+
+    # Create a scatter plot of the 2D distances for the time series of each class.
+    for i, y in enumerate(unique_lbl):
+        plt.scatter(distances[labels == y][:, 0],
+                    distances[labels == y][:, 1],
+                    c=[cmap(i/3)] * np.sum(labels == y),
+                    edgecolors='k',
+                    label='Class {}'.format(y)
+                    )
+
+    # Create a meshgrid of the decision boundaries
+    xmin = np.min(distances[:, 0]) - 0.1
+    xmax = np.max(distances[:, 0]) + 0.1
+    ymin = np.min(distances[:, 1]) - 0.1
+    ymax = np.max(distances[:, 1]) + 0.1
+    xx, yy = np.meshgrid(np.arange(xmin, xmax, (xmax - xmin)/200),
+                            np.arange(ymin, ymax, (ymax - ymin)/200))
+    Z = []
+    for x, y in np.c_[xx.ravel(), yy.ravel()]:
+        Z.append([(biases[i] + weights[0][i]*x + weights[1][i]*y > 0)
+                               for i in range(len(biases))])
+    Z = np.array(Z).reshape(xx.shape)
+    fig.axes[0].contourf(xx, yy, Z, cmap=cmap, alpha=0.25)
+
+    fig.axes[0].legend()
+    fig.axes[0].set_xlabel('$d(\\mathbf{x}, \\mathbf{s}_1)$')
+    fig.axes[0].set_ylabel('$d(\\mathbf{x}, \\mathbf{s}_2)$')
+    fig.axes[0].set_xlim((xmin, xmax))
+    fig.axes[0].set_ylim((ymin, ymax))
+    fig.axes[0].set_title('Distance transformed time series')
     plt.show()
 
 
